@@ -249,6 +249,45 @@ const deleteXRay = async (req, res) => {
 };
 
 // Routes
+// GET /api/xrays - Get all X-rays for current user or all (admin)
+router.get('/', auth, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+
+    let query = {};
+    
+    // Non-admin users can only see their own X-rays
+    if (req.user.role !== 'admin') {
+      query.userId = req.user._id;
+    }
+
+    const xrays = await XRayImage.find(query)
+      .populate('userId', 'firstName lastName email')
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .sort({ uploadDate: -1 });
+
+    const total = await XRayImage.countDocuments(query);
+
+    res.json({
+      success: true,
+      count: xrays.length,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+      data: {
+        xrays
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 router.get('/user/:userId', auth, authorizePatientAccess, getUserXRays);
 router.get('/:id', auth, getXRay);
 router.post('/', auth, upload.single('xrayImage'), uploadXRay);

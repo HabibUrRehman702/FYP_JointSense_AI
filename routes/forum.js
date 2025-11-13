@@ -540,12 +540,19 @@ const getForumCategories = async (req, res) => {
 };
 
 // Routes
+// GET /api/forum - Get all forum posts (redirects to /posts for consistency)
+router.get('/', auth, getForumPosts);
+
 router.get('/posts', auth, getForumPosts);
 router.get('/posts/:id', auth, getForumPost);
 router.get('/posts/:id/comments', auth, getPostComments);
 router.get('/categories', auth, getForumCategories);
 router.post('/posts', auth, createForumPost);
 router.post('/posts/:id/comments', auth, createComment);
+
+// POST /api/forum - Create forum post (alternative to /posts)
+router.post('/', auth, createForumPost);
+
 router.put('/posts/:id', auth, updateForumPost);
 router.put('/posts/:id/like', auth, toggleLikePost);
 router.put('/comments/:id', auth, updateComment);

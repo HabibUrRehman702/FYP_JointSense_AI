@@ -42,6 +42,8 @@ const generateToken = (id) => {
  *               - password
  *               - firstName
  *               - lastName
+ *               - dateOfBirth
+ *               - gender
  *             properties:
  *               email:
  *                 type: string
@@ -72,6 +74,51 @@ const generateToken = (id) => {
  *                 type: string
  *                 enum: [patient, doctor, admin]
  *                 example: patient
+ *                 description: User role (default is patient)
+ *               adminSecret:
+ *                 type: string
+ *                 example: admin123secret
+ *                 description: Required only for admin role registration. Set ADMIN_REGISTRATION_SECRET in .env file.
+ *               medicalInfo:
+ *                 type: object
+ *                 description: Required for patient role
+ *                 properties:
+ *                   height:
+ *                     type: number
+ *                     example: 175
+ *                   bloodType:
+ *                     type: string
+ *                     enum: [A+, A-, B+, B-, AB+, AB-, O+, O-]
+ *                     example: O+
+ *                   allergies:
+ *                     type: array
+ *                     items:
+ *                       type: string
+ *                     example: ["Penicillin"]
+ *                   chronicConditions:
+ *                     type: array
+ *                     items:
+ *                       type: string
+ *                     example: ["Diabetes"]
+ *               doctorInfo:
+ *                 type: object
+ *                 description: Required for doctor role
+ *                 required:
+ *                   - licenseNumber
+ *                   - specialization
+ *                 properties:
+ *                   licenseNumber:
+ *                     type: string
+ *                     example: MED-12345
+ *                   specialization:
+ *                     type: string
+ *                     example: Orthopedics
+ *                   experience:
+ *                     type: number
+ *                     example: 10
+ *                   hospital:
+ *                     type: string
+ *                     example: City Hospital
  *     responses:
  *       201:
  *         description: User registered successfully
@@ -96,6 +143,8 @@ const generateToken = (id) => {
  *                       example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
  *       400:
  *         $ref: '#/components/responses/ValidationError'
+ *       403:
+ *         description: Invalid admin secret key
  */
 // @desc    Register user
 // @route   POST /api/auth/register
@@ -109,7 +158,10 @@ const register = asyncHandler(async (req, res) => {
     phone,
     dateOfBirth,
     gender,
-    role = 'patient'
+    role = 'patient',
+    adminSecret,
+    medicalInfo,
+    doctorInfo
   } = req.body;
 
   // Check if user already exists
@@ -119,6 +171,36 @@ const register = asyncHandler(async (req, res) => {
       success: false,
       message: 'User already exists with this email'
     });
+  }
+  
+  // Validate admin registration with secret key
+  if (role === 'admin') {
+    const ADMIN_SECRET = process.env.ADMIN_REGISTRATION_SECRET || 'admin123secret';
+    if (!adminSecret || adminSecret !== ADMIN_SECRET) {
+      return res.status(403).json({
+        success: false,
+        message: 'Invalid admin secret key. Admin registration requires authorization.'
+      });
+    }
+  }
+  
+  // Validate doctor-specific fields
+  if (role === 'doctor') {
+    if (!doctorInfo || !doctorInfo.licenseNumber || !doctorInfo.specialization) {
+      return res.status(400).json({
+        success: false,
+        message: 'Doctor registration requires license number and specialization'
+      });
+    }
+    
+    // Check for duplicate license number
+    const existingDoctor = await User.findOne({ 'doctorInfo.licenseNumber': doctorInfo.licenseNumber });
+    if (existingDoctor) {
+      return res.status(400).json({
+        success: false,
+        message: 'A doctor with this license number already exists'
+      });
+    }
   }
 
   // Create user
@@ -130,7 +212,9 @@ const register = asyncHandler(async (req, res) => {
     phone,
     dateOfBirth,
     gender,
-    role
+    role,
+    medicalInfo: role === 'patient' ? medicalInfo : undefined,
+    doctorInfo: role === 'doctor' ? doctorInfo : undefined
   });
 
   // Log activity

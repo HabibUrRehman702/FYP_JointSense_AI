@@ -462,6 +462,56 @@ const deleteConsultation = async (req, res) => {
 };
 
 // Routes
+// GET /api/consultations - Get consultations for current user (patient sees their own, doctor sees their consultations)
+router.get('/', auth, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const status = req.query.status;
+
+    let query = {};
+    
+    // Patients see their own consultations
+    if (req.user.role === 'patient') {
+      query.patientId = req.user._id;
+    }
+    // Doctors see consultations where they are the doctor
+    else if (req.user.role === 'doctor') {
+      query.doctorId = req.user._id;
+    }
+    // Admins see all consultations (no filter)
+    
+    if (status) {
+      query.status = status;
+    }
+
+    const consultations = await Consultation.find(query)
+      .populate('patientId', 'firstName lastName email')
+      .populate('doctorId', 'firstName lastName email doctorInfo')
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .sort({ scheduledAt: -1 });
+
+    const total = await Consultation.countDocuments(query);
+
+    res.json({
+      success: true,
+      count: consultations.length,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+      data: {
+        consultations
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 router.get('/user/:userId', auth, getUserConsultations);
 router.get('/upcoming/:userId', auth, getUpcomingConsultations);
 router.get('/:id', auth, getConsultation);

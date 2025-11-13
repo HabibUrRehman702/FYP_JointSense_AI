@@ -3,6 +3,54 @@ const router = express.Router();
 const { DoctorPatientRelation, User } = require('../models');
 const { auth, authorize } = require('../middleware/auth');
 
+// GET /api/doctor-patient-relations - Get relationships for current user
+router.get('/', auth, async (req, res) => {
+  try {
+    const { page = 1, limit = 10, isActive } = req.query;
+
+    let query = {};
+    
+    // Doctors see their patient relationships
+    if (req.user.role === 'doctor') {
+      query.doctorId = req.user._id;
+    }
+    // Patients see their doctor relationships
+    else if (req.user.role === 'patient') {
+      query.patientId = req.user._id;
+    }
+    // Admins see all relationships
+    
+    if (isActive !== undefined) {
+      query.isActive = isActive === 'true';
+    }
+
+    const relations = await DoctorPatientRelation.find(query)
+      .populate('patientId', 'firstName lastName email phone')
+      .populate('doctorId', 'firstName lastName email doctorInfo')
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .sort({ startDate: -1 });
+
+    const total = await DoctorPatientRelation.countDocuments(query);
+
+    res.json({
+      success: true,
+      count: relations.length,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+      data: {
+        relations
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 // @desc    Get all doctor-patient relationships for a doctor
 // @route   GET /api/doctor-patient-relations/doctor/:doctorId
 // @access  Private (Doctor only)

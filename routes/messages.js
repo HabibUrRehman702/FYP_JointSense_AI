@@ -444,6 +444,9 @@ const startConversation = async (req, res) => {
 };
 
 // Routes
+// GET /api/messages - Get conversations for current user
+router.get('/', auth, getConversations);
+
 router.get('/conversations', auth, getConversations);
 router.get('/conversation/:conversationId', auth, getConversationMessages);
 router.get('/unread-count', auth, getUnreadCount);

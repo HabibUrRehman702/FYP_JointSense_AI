@@ -400,6 +400,49 @@ const generateRecommendations = async (req, res) => {
 };
 
 // Routes
+// GET /api/recommendations - Get current user's recommendations
+router.get('/', auth, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const klGrade = req.query.klGrade;
+    const isActive = req.query.isActive;
+
+    let query = { userId: req.user._id };
+    
+    if (klGrade) {
+      query.klGrade = parseInt(klGrade);
+    }
+    
+    if (isActive !== undefined) {
+      query.isActive = isActive === 'true';
+    }
+
+    const recommendations = await Recommendation.find(query)
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .sort({ generatedAt: -1 });
+
+    const total = await Recommendation.countDocuments(query);
+
+    res.json({
+      success: true,
+      count: recommendations.length,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+      data: {
+        recommendations
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 router.get('/user/:userId', auth, authorizePatientAccess, getUserRecommendations);
 router.get('/active/:userId', auth, authorizePatientAccess, getActiveRecommendations);
 router.get('/:id', auth, getRecommendation);

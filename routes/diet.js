@@ -381,6 +381,39 @@ const getNutritionSummary = async (req, res) => {
 };
 
 // Routes
+// GET /api/diet - Get current user's diet logs
+router.get('/', auth, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+
+    let query = { userId: req.user._id };
+
+    const dietLogs = await DietLog.find(query)
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .sort({ date: -1 });
+
+    const total = await DietLog.countDocuments(query);
+
+    res.json({
+      success: true,
+      count: dietLogs.length,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+      data: {
+        dietLogs
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 router.get('/user/:userId', auth, authorizePatientAccess, getUserDietLogs);
 router.get('/stats/:userId', auth, authorizePatientAccess, getDietStats);
 router.get('/nutrition/:userId', auth, authorizePatientAccess, getNutritionSummary);

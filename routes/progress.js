@@ -357,6 +357,51 @@ const getProgressionAnalytics = async (req, res) => {
 };
 
 // Routes
+// GET /api/progress - Get progress reports for current user
+router.get('/', auth, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+
+    let query = {};
+    
+    // Patients see their own reports
+    if (req.user.role === 'patient') {
+      query.userId = req.user._id;
+    }
+    // Doctors see reports they created
+    else if (req.user.role === 'doctor') {
+      query.generatedBy = req.user._id;
+    }
+    // Admins see all reports
+
+    const reports = await ProgressReport.find(query)
+      .populate('userId', 'firstName lastName email')
+      .populate('generatedBy', 'firstName lastName email')
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .sort({ generatedDate: -1 });
+
+    const total = await ProgressReport.countDocuments(query);
+
+    res.json({
+      success: true,
+      count: reports.length,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+      data: {
+        reports
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 router.get('/reports/:userId', auth, authorizePatientAccess, getUserProgressReports);
 router.get('/reports/single/:id', auth, getProgressReport);
 router.get('/progression/:userId', auth, authorizePatientAccess, getDiseaseProgression);

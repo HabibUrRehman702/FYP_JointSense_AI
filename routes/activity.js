@@ -321,6 +321,39 @@ const getActivityStats = async (req, res) => {
 };
 
 // Routes
+// GET /api/activity - Get current user's activity logs
+router.get('/', auth, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+
+    let query = { userId: req.user._id };
+
+    const activityLogs = await ActivityLog.find(query)
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .sort({ date: -1 });
+
+    const total = await ActivityLog.countDocuments(query);
+
+    res.json({
+      success: true,
+      count: activityLogs.length,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+      data: {
+        activityLogs
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 router.get('/user/:userId', auth, authorizePatientAccess, getUserActivityLogs);
 router.get('/stats/:userId', auth, authorizePatientAccess, getActivityStats);
 router.get('/:id', auth, getActivityLog);

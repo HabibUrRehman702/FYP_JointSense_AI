@@ -393,6 +393,105 @@ const broadcastNotification = async (req, res) => {
 };
 
 // Routes
+// GET /api/notifications - Get current user's notifications
+router.get('/', auth, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const isRead = req.query.isRead;
+    const type = req.query.type;
+
+    let query = { userId: req.user._id, isActive: true };
+    
+    if (isRead !== undefined) {
+      query.isRead = isRead === 'true';
+    }
+    
+    if (type) {
+      query.type = type;
+    }
+
+    // Filter out expired notifications
+    query.$or = [
+      { expiresAt: null },
+      { expiresAt: { $gt: new Date() } }
+    ];
+
+    const notifications = await Notification.find(query)
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .sort({ scheduledFor: -1 });
+
+    const total = await Notification.countDocuments(query);
+    const unreadCount = await Notification.countDocuments({
+      userId: req.user._id,
+      isRead: false,
+      isActive: true,
+      $or: [
+        { expiresAt: null },
+        { expiresAt: { $gt: new Date() } }
+      ]
+    });
+
+    res.json({
+      success: true,
+      count: notifications.length,
+      total,
+      unreadCount,
+      page,
+      pages: Math.ceil(total / limit),
+      data: {
+        notifications
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// PUT /api/notifications - Mark multiple notifications as read
+router.put('/', auth, async (req, res) => {
+  try {
+    const { notificationIds } = req.body;
+    
+    if (!notificationIds || !Array.isArray(notificationIds)) {
+      return res.status(400).json({
+        success: false,
+        message: 'notificationIds array is required'
+      });
+    }
+
+    const result = await Notification.updateMany(
+      { 
+        _id: { $in: notificationIds },
+        userId: req.user._id
+      },
+      { 
+        $set: { 
+          isRead: true,
+          readAt: new Date()
+        }
+      }
+    );
+
+    res.json({
+      success: true,
+      message: `${result.modifiedCount} notifications marked as read`,
+      data: {
+        modifiedCount: result.modifiedCount
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 router.get('/user/:userId', auth, authorizePatientAccess, getUserNotifications);
 router.get('/stats/:userId', auth, authorizePatientAccess, getNotificationStats);
 router.get('/:id', auth, getNotification);

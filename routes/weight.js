@@ -336,6 +336,39 @@ const getLatestWeight = async (req, res) => {
 };
 
 // Routes
+// GET /api/weight - Get current user's weight logs
+router.get('/', auth, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+
+    let query = { userId: req.user._id };
+
+    const weightLogs = await WeightLog.find(query)
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .sort({ measuredAt: -1 });
+
+    const total = await WeightLog.countDocuments(query);
+
+    res.json({
+      success: true,
+      count: weightLogs.length,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+      data: {
+        weightLogs
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 router.get('/user/:userId', auth, authorizePatientAccess, getUserWeightLogs);
 router.get('/stats/:userId', auth, authorizePatientAccess, getWeightStats);
 router.get('/latest/:userId', auth, authorizePatientAccess, getLatestWeight);

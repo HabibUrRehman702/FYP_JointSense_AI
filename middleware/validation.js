@@ -10,6 +10,11 @@ const userRegistrationSchema = Joi.object({
   dateOfBirth: Joi.date().required(),
   gender: Joi.string().valid('male', 'female', 'other').required(),
   role: Joi.string().valid('patient', 'doctor', 'admin').default('patient'),
+  adminSecret: Joi.string().when('role', {
+    is: 'admin',
+    then: Joi.required(),
+    otherwise: Joi.forbidden()
+  }),
   medicalInfo: Joi.object({
     height: Joi.number().min(100).max(250).optional(),
     bloodType: Joi.string().valid('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-').optional(),

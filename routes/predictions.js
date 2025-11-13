@@ -376,6 +376,56 @@ const getPredictionStats = async (req, res) => {
 };
 
 // Routes
+// GET /api/predictions - Get all predictions (admin) or current user's predictions
+router.get('/', auth, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const klGrade = req.query.klGrade;
+    const oaStatus = req.query.oaStatus;
+
+    let query = {};
+    
+    // Non-admin users can only see their own predictions
+    if (req.user.role !== 'admin') {
+      query.userId = req.user._id;
+    }
+    
+    if (klGrade) {
+      query.klGrade = parseInt(klGrade);
+    }
+    
+    if (oaStatus) {
+      query.oaStatus = oaStatus;
+    }
+
+    const predictions = await AIPrediction.find(query)
+      .populate('userId', 'firstName lastName email')
+      .populate('xrayImageId', 'imageUrl uploadDate')
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .sort({ predictionDate: -1 });
+
+    const total = await AIPrediction.countDocuments(query);
+
+    res.json({
+      success: true,
+      count: predictions.length,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+      data: {
+        predictions
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 router.get('/user/:userId', auth, authorizePatientAccess, getUserPredictions);
 router.get('/stats/:userId', auth, authorizePatientAccess, getPredictionStats);
 router.get('/:id', auth, getPrediction);

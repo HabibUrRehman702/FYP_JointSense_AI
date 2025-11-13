@@ -389,6 +389,44 @@ const getTodaysMedications = async (req, res) => {
 };
 
 // Routes
+// GET /api/medications - Get current user's medication reminders
+router.get('/', auth, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const isActive = req.query.isActive;
+
+    let query = { userId: req.user._id };
+    
+    if (isActive !== undefined) {
+      query.isActive = isActive === 'true';
+    }
+
+    const medications = await MedicationReminder.find(query)
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .sort({ startDate: -1 });
+
+    const total = await MedicationReminder.countDocuments(query);
+
+    res.json({
+      success: true,
+      count: medications.length,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+      data: {
+        medications
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 router.get('/user/:userId', auth, authorizePatientAccess, getUserMedicationReminders);
 router.get('/stats/:userId', auth, authorizePatientAccess, getMedicationStats);
 router.get('/today/:userId', auth, authorizePatientAccess, getTodaysMedications);
